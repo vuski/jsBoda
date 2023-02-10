@@ -3,6 +3,7 @@ const schoolInfo = './학교정보.tsv';
 
 import {Deck}  from '@deck.gl/core';
 import {ScatterplotLayer, TextLayer, BitmapLayer, SolidPolygonLayer, GeoJsonLayer} from '@deck.gl/layers';
+import {GPUGridLayer, GridLayer} from '@deck.gl/aggregation-layers';
 import {DataFilterExtension} from '@deck.gl/extensions';
 import {CSVLoader} from '@loaders.gl/csv';
 import {JSONLoader} from '@loaders.gl/json'
@@ -304,7 +305,28 @@ const update = () => {
         extensions: [new DataFilterExtension({filterSize: 1})]    
         // visible: true,
         // wrapLongitude: false,
-      })
+      }),
+      // new GPUGridLayer({
+      //   id: 'new-grid-layer',
+      //   data : schoolData,
+      //   //pickable: true,
+      //   extruded: true,
+      //   coverage : 0.7,
+      //   cellSize: 10000,
+      //   getColorWeight: d => d.persons,
+      //   colorAggregation: 'SUM',
+      //   getElevationWeight: d => d.persons,
+      //   elevationDomain : [0, 100000],
+      //   elevationAggregation: 'SUM',
+      //   elevationScale: 140,
+      //   getPosition: d => [d.x, d.y],
+      //   gpuAggregation : true,
+      //   //elevationLowerPercentile : 95,
+      //   visible : true
+      //   // updateTriggers: {
+      //   //   filterRange : time
+      //   // }
+      // }),
     
   ];
 

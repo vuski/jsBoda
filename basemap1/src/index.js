@@ -12,13 +12,14 @@ const SECURE_AREA = './어린이보호구역_20220428.geojson';
 import {Deck, _GlobeView as GlobeView}  from '@deck.gl/core';
 import {ScatterplotLayer, SolidPolygonLayer, GeoJsonLayer, ArcLayer} from '@deck.gl/layers';
 import {CSVLoader} from '@loaders.gl/csv';
-import {JSONLoader} from '@loaders.gl/json'
+import {JSONLoader} from '@loaders.gl/json';
+import GL from '@luma.gl/constants';
 import {load} from '@loaders.gl/core';
 
 
 const deckgl = new Deck({
   parent: document.getElementById('container'),
-  views: new GlobeView(),
+  //views: new GlobeView(),
   initialViewState: {
     latitude: 36.686033, 
     longitude: 127.938015,
@@ -27,13 +28,13 @@ const deckgl = new Deck({
     pitch: 0
   },
   controller: true,
-  // getTooltip: ({object}) => object && {
-  //   html: `<h2>${object.acdnt_dd_dc}</h2><div>${object.acdnt_age_2_dc}</div>`,
-  //   style: {
-  //     backgroundColor: '#ffff00',
-  //     fontSize: '0.8em'
-  //   }
-  // }
+  getTooltip: ({object}) => object && {
+    html: `<h2>${object.acdnt_dd_dc}</h2><div>${object.acdnt_age_2_dc}</div>`,
+    style: {
+      backgroundColor: '#ffff00',
+      fontSize: '0.8em'
+    }
+  }
   
  
 });
@@ -131,11 +132,18 @@ const update = () => {
       data: AIR_PORTS,
       dataTransform: d => d.features.filter(f => f.properties.scalerank < 4),
       // Styles
+      // parameters: {
+      //   blendFunc:[GL.SRC_ALPHA, GL.ONE, GL.ONE_MINUS_DST_ALPHA, GL.ONE],
+      //   blendEquation: GL.FUNC_ADD,
+      //   depthTest: false,
+      // },
       getSourcePosition: f => [-0.4531566,51.4709959], // London
       getTargetPosition: f => f.geometry.coordinates,
       getSourceColor: [0, 128, 200],
       getTargetColor: [200, 0, 80],
       getWidth: 1,
+      getHeight : 0.1,
+      //getTilt : 90
     })
   
   ];
