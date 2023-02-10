@@ -1,0 +1,24 @@
+{
+  "dependencies": {
+    "@loaders.gl/csv": "^3.2.4",
+    "@loaders.gl/json": "^3.2.4",
+    "deck.gl": "^8.8.23",
+    "loaders.gl": "^0.3.5"
+  },
+  "name": "basemap0",
+  "version": "1.0.0",
+  "main": "index.js",
+  "devDependencies": {
+    "html-webpack-plugin": "^5.5.0",
+    "webpack": "^5.73.0",
+    "webpack-cli": "^4.10.0"
+  },
+  "scripts": {
+    "dev": "webpack --mode development",
+    "start": "webpack-dev-server --mode development --open"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
