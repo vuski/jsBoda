@@ -73,7 +73,7 @@ let schoolData;
 
 const update = () => {
 
-  const layers =  [
+  const layers123 =  [
 
     new ScatterplotLayer({
       id: 'school',
@@ -92,8 +92,8 @@ const update = () => {
       //   return d.persons>=120? [255,120,33,180] : [194, 3, 75, 180];
       // },
 
-      pickable: true,
-      autoHighlight: true,
+      // pickable: true,
+      // autoHighlight: true,
       // updateTriggers: {
       //   // This tells deck.gl to recalculate radius when `currentYear` changes
       //   getRadius : [currentZoom]
@@ -106,14 +106,14 @@ const update = () => {
 
 
   deckOverlay.setProps({
-    layers : layers
+    layers : layers123
   });  
 
 };
 
 
-window.addEventListener('resize', function() {
-  const w = window.innerWidth, h = window.innerHeight;
+// window.addEventListener('resize', function() {
+//   const w = window.innerWidth, h = window.innerHeight;
 
-  update();
-});
+//   update();
+// });

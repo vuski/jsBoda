@@ -1,7 +1,7 @@
 // source: Natural Earth http://www.naturalearthdata.com/ via geojson.xyz
 const WORLD =
   'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_admin_0_scale_rank.geojson'; //eslint-disable-line
-
+const bbox__ = "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_wgs84_bounding_box.geojson";
 const COUNTRIES =
   './emd_single2.geojson'; //eslint-disable-line
 const AIR_PORTS =
@@ -28,13 +28,13 @@ const deckgl = new Deck({
     pitch: 0
   },
   controller: true,
-  getTooltip: ({object}) => object && {
-    html: `<h2>${object.acdnt_dd_dc}</h2><div>${object.acdnt_age_2_dc}</div>`,
-    style: {
-      backgroundColor: '#ffff00',
-      fontSize: '0.8em'
-    }
-  }
+  // getTooltip: ({object}) => object && {
+  //   html: `<h2>${object.acdnt_dd_dc}</h2><div>${object.acdnt_age_2_dc}</div>`,
+  //   style: {
+  //     backgroundColor: '#ffff00',
+  //     fontSize: '0.8em'
+  //   }
+  // }
   
  
 });
@@ -49,16 +49,26 @@ let visible02 = true;
 const update = () => {
 
   const layers =  [
-    new SolidPolygonLayer({
-      id: 'background',
-      data: [
-        [[-180, 90], [180, 90], [180, -90], [-180, -90]]
-      ],
-      opacity: 0.5,
-      getPolygon: d => d,
+    // new SolidPolygonLayer({
+    //   id: 'background',
+    //   data: [
+    //     [[-180, 90], [180, 90], [180, -90], [-180, -90]]
+    //   ],
+    //   opacity: 0.5,
+    //   getPolygon: datum => datum,
+    //   stroked: false,
+    //   filled: true,
+    //   getFillColor: [5, 10, 40]
+    // }),
+    new GeoJsonLayer({
+      id: 'bbox',
+      data: bbox__,
+      // Styles
       stroked: false,
       filled: true,
-      getFillColor: [5, 10, 40]
+      // lineWidthMinPixels: 2,
+      // getLineColor: [5, 10, 40],
+      getFillColor: [5*10, 10*10, 40*10]
     }),
     new GeoJsonLayer({
       id: 'base-world',
@@ -96,20 +106,21 @@ const update = () => {
       visible : visible01
     }),
     new ScatterplotLayer({
-      id: 'accident',
+      id: 'accident123',
       data: ACDNT,
       loaders: CSVLoader,
       loadOptions: {
         csv: {
-          //delimiter: '\t',
-          dynamicTyping: true,
-          skipEmptyLines: true
+          delimiter: '\t',
+          // dynamicTyping: true,
+          // skipEmptyLines: true
         }
       },
       // Styles
       filled: true,
+      //stroked : true,
       
-      radiusMinPixels: size,
+      radiusMinPixels: 2,
       radiusScale: 1,
       getPosition: d => [d.lon,d.lat],
       getRadius: 50,
@@ -117,33 +128,33 @@ const update = () => {
       getFillColor: [200, 0, 80, 180],
       // Interactive props
       pickable: true,
-      autoHighlight: true,
+      //autoHighlight: true,
       onHover: ({object}) => object && console.log(`${object.acdnt_dd_dc} (${object.acdnt_age_2_dc})`),
 
-      updateTriggers: {
-        // This tells deck.gl to recalculate radius when `currentYear` changes
-        radiusMinPixels: size,
-      },
-      visible : visible02
+      // updateTriggers: {
+      //   // This tells deck.gl to recalculate radius when `currentYear` changes
+      //   radiusMinPixels: size,
+      // },
+      // visible : visible02
   
     }),
     new ArcLayer({
       id: 'arcs',
       data: AIR_PORTS,
-      dataTransform: d => d.features.filter(f => f.properties.scalerank < 4),
-      // Styles
-      // parameters: {
-      //   blendFunc:[GL.SRC_ALPHA, GL.ONE, GL.ONE_MINUS_DST_ALPHA, GL.ONE],
-      //   blendEquation: GL.FUNC_ADD,
-      //   depthTest: false,
-      // },
-      getSourcePosition: f => [-0.4531566,51.4709959], // London
+      dataTransform: d => d.features.filter(f => f.properties.scalerank < 10000),
+      //Styles
+      parameters: {
+        blendFunc:[GL.SRC_ALPHA, GL.ONE, GL.ONE_MINUS_DST_ALPHA, GL.ONE],
+        blendEquation: GL.FUNC_ADD,
+        depthTest: false,
+      },
+      getSourcePosition: [-0.4531566,51.4709959], // London
       getTargetPosition: f => f.geometry.coordinates,
       getSourceColor: [0, 128, 200],
       getTargetColor: [200, 0, 80],
-      getWidth: 1,
-      getHeight : 0.1,
-      //getTilt : 90
+      getWidth: 3,
+      getHeight : 0.3,
+      getTilt : 90
     })
   
   ];
