@@ -71,82 +71,101 @@ const update = () => {
     //   filled: true,
     //   getFillColor: [5, 10, 40]
     // }),
+
+
+    // kt map은 epsg5179에서 정사각형으로 제작됨(인덱스도 epsg5179기준으로 부여됨)
+    // deckgl은 epsg4326기준 정사각형 타일맵을 불러올 수 있으므로,
+    // epsg5179 타일의 정사각형 네 꼭지점을 epsg4326으로 변환(->부정형이 됨)하여 타일 이미지를 텍스쳐 매핑함
+
     new TileLayer({
       id: "background-map",
-      data:   "./test1.png",//
-      // coordinateSystem: COORDINATE_SYSTEM.METER_OFFSETS,
-      // coordinateOrigin: [127.5, 38, 0],  
-      // modelMatrix : [
-      //   1, 0, 0, 0,  
-      //     0, 1, 0, 0,  
-      //     0, 0, 1, 0,      
-      //     -1000000, -2000000, 0, 1   
-      // ],
-      // minZoom: Screen.zoom.MAP_MIN,
-      // maxZoom: Screen.zoom.MAP_MAX,
-      tileSize: 256,
+      //data:   "./test1.png",
+
+      tileSize: 256,      
+
+      // 먼저 getTileLayer가 작동하고
+      // 그 후에 renderSubLayer가 작동함
+      getTileData: ({index,  signal, bbox }) => {
+
+        if (signal.aborted) {
+          console.log("signal.aborted:",signal);
+          return null;
+        }
+
+        const ktmapExtent = {minx:171162, miny:1214781, maxx:1744026, maxy:2787645};
+
+        // EPSG:4326과 EPSG:5179의 정의
+        const epsg4326 = 'EPSG:4326';
+        const epsg5179 = '+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 +x_0=1000000 +y_0=2000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs';
+
+        const adjustedZ = index.z - 6; // 서버가 일반적인 줌 레벨보다 6만큼 작게 처리
+
+        //일단, 현재 타일의 위경도 중심점을 찾는다.
+        const tileCenter4326 = proj4(epsg4326, epsg5179, [(bbox.west+bbox.east)/2, (bbox.south+bbox.north)/2]);
+        const diff = {x:tileCenter4326[0]- ktmapExtent.minx, y:ktmapExtent.maxy - tileCenter4326[1]};
+        
+        const tileSize = 256;//px
+        const res = 2048 / Math.pow(2,adjustedZ);
+        const tile_x_index = parseInt(diff.x / (res * tileSize));
+        const tile_y_index = parseInt(diff.y / (res * tileSize));
+
+        const newUrl = `https://tile.gis.kt.com/current/base.default/${adjustedZ}/${tile_y_index}/${tile_x_index}.png`;
+
+        // 타일 데이터를 반환하기 위한 fetch 호출
+        return fetch(newUrl)
+          .then(response => response.blob())
+          .then(blob => createImageBitmap(blob));
+      },
+
       renderSubLayers: (props) => {
         const {
           bbox: { west, south, east, north },
         } = props.tile;
-        console.log("props",props);
+       
         const epsg4326 = 'EPSG:4326';
-        const epsg3857 = 'EPSG:3857';
         const epsg5179 = '+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 +x_0=1000000 +y_0=2000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs';
         
-        // const [_west, _north] = proj4(epsg4326, epsg3857, [west, north]);
-        // const [_east, _south] = proj4(epsg4326, epsg3857, [east, south]);
-        // console.log(_west, _south, _east, _north);
+        //kt map 한계범위(epsg5179 좌표계)
+        const ktmapExtent = {minx:171162, miny:1214781, maxx:1744026, maxy:2787645};
 
-        const base = {minx:171162, miny:1214781, maxx:1744026, maxy:2787645};
-        console.log(west, south, east, north);
-        const adjustedZ = props.tile.zoom - 6;
+        const adjustedZ = props.tile.zoom - 6; //ktmap은 표준과 6 차이남
 
-        const tilexy = proj4(epsg4326, epsg5179, [(west+east)/2, (south+north)/2]);
-        const diff = {x:tilexy[0]- base.minx, y:base.maxy - tilexy[1]};
+        //현재 처리하는 타일의 기준 좌표는 epsg4326 기준.
+        //처리하는 타일의 사각형 네 꼭지점  [x0,y0], [x1,y1],[x2,y2],[x3,y3] 을 구한다.
+        //구하는 사각형은 우선 epsg5179 기준으로 구하고(tile5179) - epsg5179에서 정사각형임
+        //좌표계 변환하여 epsg4326의 네 꼭지점( [x0,y0], [x1,y1],[x2,y2],[x3,y3])으로 변환한다. - epsg4326에서 부정형의 사각형이 됨
+        //그 부정형의 사각형에 epsg5179의 정사각형 타일맵을 텍스쳐로 입힘
+        //텍스쳐 변환은 gpu에서 이루어짐
+        const tileCenter4326 = proj4(epsg4326, epsg5179, [(west+east)/2, (south+north)/2]);
+        const diff = {x:tileCenter4326[0]- ktmapExtent.minx, y:ktmapExtent.maxy - tileCenter4326[1]};
         
         const tileSize = 256;//px
         const res = 2048 / Math.pow(2,adjustedZ);
-        const xx = parseInt(diff.x / (res * tileSize)) * (res * tileSize) + base.minx;
-        const yy = base.maxy - (parseInt(diff.y / (res * tileSize)) * (res * tileSize));
+        const tile5179_xmin = parseInt(diff.x / (res * tileSize)) * (res * tileSize) + ktmapExtent.minx;
+        const tile5179_ymax = ktmapExtent.maxy - (parseInt(diff.y / (res * tileSize)) * (res * tileSize));
 
         const tile5179 = {
-          xmin : xx,
-          xmax : xx  + (res * tileSize),
-          ymin : yy  - (res * tileSize),
-          ymax : yy,
+          xmin : tile5179_xmin,
+          xmax : tile5179_xmin  + (res * tileSize),
+          ymin : tile5179_ymax  - (res * tileSize),
+          ymax : tile5179_ymax,
         };
 
         const [x0,y0] = proj4(epsg5179, epsg4326, [tile5179.xmin, tile5179.ymin]);
         const [x1,y1] = proj4(epsg5179, epsg4326, [tile5179.xmin, tile5179.ymax]);
         const [x2,y2] = proj4(epsg5179, epsg4326, [tile5179.xmax, tile5179.ymax]);
         const [x3,y3] = proj4(epsg5179, epsg4326, [tile5179.xmax, tile5179.ymin]);
-        console.log([ [x0,y0], [x1,y1],[x2,y2],[x3,y3] ]);
-
 
         return new BitmapLayer(props, {
-
           data: null,
           image: props.data,
-          // coordinateSystem: COORDINATE_SYSTEM.METER_OFFSETS,
-          // coordinateOrigin: [127.5, 38, 0],  
-          // modelMatrix : [
-          //   1, 0, 0, 0,  
-          //     0, 1, 0, 0,  
-          //     0, 0, 1, 0,      
-          //     -1000000, -2000000, 0, 1   
-          // ],
-          //bounds: [west, south, east, north],
           bounds: [ [x0,y0], [x1,y1],[x2,y2],[x3,y3] ],
-          //_imageCoordinateSystem :COORDINATE_SYSTEM.CARTESIAN,
-
           desaturate: 0.7,
           //transparentColor: [255, 0, 0, 255],
         });
       },
-      //zoomOffset : -6,
       //extent: [117, 28, 133, 44],
-      //refinementStrategy : 'no-overlap',
+      refinementStrategy : 'no-overlap',
       onTileError: (error, tile) => {},
       onHover: ({ lngLat }) => {
         //console.log(`Longitude: ${lngLat[0]}, Latitude: ${lngLat[1]}`);
@@ -155,84 +174,8 @@ const update = () => {
         depthTest: false,
       },
 
-      // extensions: [new MaskExtension()],
-      getTileData: ({index, url, signal, bbox }) => {
-
-        console.log("bbox",bbox);  
-        if (signal.aborted) {
-          console.log("signal.aborted:",signal);
-          return null;
-        }
-
-        const base = {minx:171162, miny:1214781, maxx:1744026, maxy:2787645};
-        //base.minx = (base.maxx-base.minx)*0.1667+base.minx;
-        //base.maxy = (base.maxy - base.miny)*0.83333 + base.miny;
-        //const base = {minx:117.05424125914848, miny:30.68592024862086, maxx:135.25684899655164, maxy:44.614222462039535};
-        // EPSG:4326과 EPSG:5179의 정의
-        const epsg4326 = 'EPSG:4326';
-        const epsg3857 = 'EPSG:3857';
-        const epsg5179 = '+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 +x_0=1000000 +y_0=2000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs';
-        //(30.63029097235253, 118.86697148373719)
-        // 좌표 변환 함수
-        function convert4326to5179(lat, lon) {
-          // proj4를 사용하여 좌표 변환
-          const [x, y] = proj4(epsg4326, epsg5179, [lon, lat]);
-          return {x, y};
-        }
-        
-        //console.log("proj4",proj4(epsg5179, epsg4326, [base.minx, base.maxy]));
-        
-        const basexy = proj4(epsg4326, epsg3857, [base.minx, base.maxy]);
-
-        
-        
-        //base.minx = 119;
-        //base.maxy = 44;
-
-        function calculateTileXY(latitude, longitude, zoom) {
-          var latRad = latitude * Math.PI / 180;
-          var n = Math.pow(2, zoom);
-          var xTile = Math.floor((longitude + 180) / 360 * n);
-          var yTile = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
-          return {x: xTile, y: yTile};
-        }
-
-        const adjustedZ = index.z - 6; // 서버가 일반적인 줌 레벨보다 6만큼 작게 처리
-
-        //일단, 현재 타일의 위경도 중심점을 찾는다.
-        const tilexy = proj4(epsg4326, epsg5179, [(bbox.west+bbox.east)/2, (bbox.south+bbox.north)/2]);
-        const diff = {x:tilexy[0]- base.minx, y:base.maxy - tilexy[1]};
-        
-        const tileSize = 256;//px
-        const res = 2048 / Math.pow(2,adjustedZ);
-        const xx = parseInt(diff.x / (res * tileSize));
-        const yy = parseInt(diff.y / (res * tileSize));
-        //console.log(tilexy, diff, xx, yy);
-
-        const offset = calculateTileXY(base.maxy/1, base.minx/1, index.z);
-        //const offset = calculateTileXY(44, 120, index.z);
-        //30.68592024862086, 135.25684899655164
-        var tileXY = calculateTileXY((bbox.north+bbox.south)/2, (bbox.east+bbox.west)/2, index.z);
-        //var tileXY = calculateTileXY(base.maxy-bbox.north, base.minx-bbox.west, index.z);
-        //console.log(bbox, index, url, );
-        //console.log(offset, tileXY); // {x: 301, y: 385}
-        // const data = fetch(url, {signal});
-
-
-        const url_renew = `https://tile.gis.kt.com/current/base.default/${adjustedZ}/${yy}/${xx}.png`;
-        // 수정된 z 값을 사용하여 타일 URL 생성
-        //const url_renew = `https://tile.gis.kt.com/current/base.default/${adjustedZ}/${tileXY.y-offset.y}/${tileXY.x-offset.x}.png`;
-        //console.log(url_renew);
-        // 타일 데이터를 반환하기 위한 fetch 호출
-        return fetch(url_renew)
-          .then(response => response.blob())
-          .then(blob => createImageBitmap(blob));
-
-        // Expensive computation on returned data
-      },
-      // maskId: "map-mask",
       //tintColor: [200, 180, 180],
-      visible: true, //(!State.onUpdating) && (!State.onQuerying)
+      visible: true, 
     }),
 
 
