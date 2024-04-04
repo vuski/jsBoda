@@ -2,7 +2,8 @@
   "dependencies": {
     "@loaders.gl/csv": "^3.2.4",
     "@loaders.gl/json": "^3.2.4",
-    "deck.gl": "^8.8.23"
+    "deck.gl": "^8.8.23",
+    "proj4": "^2.11.0"
   },
   "name": "tutorial01",
   "version": "1.0.0",
