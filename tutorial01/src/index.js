@@ -11,9 +11,10 @@ const AIR_PORTS =
 const ACDNT = './13세이하항목축소.tsv';
 const SECURE_AREA = './어린이보호구역_20220428.geojson';
 
-import {COORDINATE_SYSTEM, Deck, _GlobeView as GlobeView}  from '@deck.gl/core';
+import {COORDINATE_SYSTEM, Deck, _GlobeView as GlobeView, WebMercatorViewport,MapView}  from '@deck.gl/core';
 import {ScatterplotLayer, SolidPolygonLayer, GeoJsonLayer, ArcLayer, BitmapLayer} from '@deck.gl/layers';
-import { TileLayer, MVTLayer } from "@deck.gl/geo-layers";
+import { MVTLayer } from "@deck.gl/geo-layers";
+import { TileLayerCustom } from './tileLayerCustom/tile-layer-custom';
 import {CSVLoader} from '@loaders.gl/csv';
 import {JSONLoader} from '@loaders.gl/json';
 import GL from '@luma.gl/constants';
@@ -22,7 +23,11 @@ import proj4 from 'proj4';
 
 const deckgl = new Deck({
   parent: document.getElementById('container'),
-  //views: new GlobeView(),
+  // views: new MapView({
+  //   width : '50%',
+  //   padding: {top: '50%', bottom: 0, left: 0, right: 0},
+  //   controller: true,
+  // }),
   initialViewState: {
     latitude: 36.686033, 
     longitude: 127.938015,
@@ -31,6 +36,7 @@ const deckgl = new Deck({
     pitch: 0
   },
   controller: true,
+  //padding: {top: 500, bottom: 500, left: 500, right: 500}
   // getTooltip: ({object}) => object && {
   //   html: `<h2>${object.acdnt_dd_dc}</h2><div>${object.acdnt_age_2_dc}</div>`,
   //   style: {
@@ -77,7 +83,7 @@ const update = () => {
     // deckgl은 epsg4326기준 정사각형 타일맵을 불러올 수 있으므로,
     // epsg5179 타일의 정사각형 네 꼭지점을 epsg4326으로 변환(->부정형이 됨)하여 타일 이미지를 텍스쳐 매핑함
 
-    new TileLayer({
+    new TileLayerCustom({
       id: "background-map",
       //data:   "./test1.png",
 
@@ -86,7 +92,7 @@ const update = () => {
       // 먼저 getTileLayer가 작동하고
       // 그 후에 renderSubLayer가 작동함
       getTileData: ({index,  signal, bbox }) => {
-
+        //console.log(bbox);
         if (signal.aborted) {
           console.log("signal.aborted:",signal);
           return null;
@@ -101,8 +107,8 @@ const update = () => {
         const adjustedZ = index.z - 6; // 서버가 일반적인 줌 레벨보다 6만큼 작게 처리
 
         //일단, 현재 타일의 위경도 중심점을 찾는다.
-        const tileCenter4326 = proj4(epsg4326, epsg5179, [(bbox.west+bbox.east)/2, (bbox.south+bbox.north)/2]);
-        const diff = {x:tileCenter4326[0]- ktmapExtent.minx, y:ktmapExtent.maxy - tileCenter4326[1]};
+        const tileCenter5179 = proj4(epsg4326, epsg5179, [(bbox.west+bbox.east)/2, (bbox.south+bbox.north)/2]);
+        const diff = {x:tileCenter5179[0]- ktmapExtent.minx, y:ktmapExtent.maxy - tileCenter5179[1]};
         
         const tileSize = 256;//px
         const res = 2048 / Math.pow(2,adjustedZ);
@@ -121,10 +127,10 @@ const update = () => {
         const {
           bbox: { west, south, east, north },
         } = props.tile;
-       
+        //console.log(props.tile);
         const epsg4326 = 'EPSG:4326';
         const epsg5179 = '+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 +x_0=1000000 +y_0=2000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs';
-        
+        //props.tile.visible = true;
         //kt map 한계범위(epsg5179 좌표계)
         const ktmapExtent = {minx:171162, miny:1214781, maxx:1744026, maxy:2787645};
 
@@ -136,8 +142,8 @@ const update = () => {
         //좌표계 변환하여 epsg4326의 네 꼭지점( [x0,y0], [x1,y1],[x2,y2],[x3,y3])으로 변환한다. - epsg4326에서 부정형의 사각형이 됨
         //그 부정형의 사각형에 epsg5179의 정사각형 타일맵을 텍스쳐로 입힘
         //텍스쳐 변환은 gpu에서 이루어짐
-        const tileCenter4326 = proj4(epsg4326, epsg5179, [(west+east)/2, (south+north)/2]);
-        const diff = {x:tileCenter4326[0]- ktmapExtent.minx, y:ktmapExtent.maxy - tileCenter4326[1]};
+        const tileCenter5179 = proj4(epsg4326, epsg5179, [(west+east)/2, (south+north)/2]);
+        const diff = {x:tileCenter5179[0]- ktmapExtent.minx, y:ktmapExtent.maxy - tileCenter5179[1]};
         
         const tileSize = 256;//px
         const res = 2048 / Math.pow(2,adjustedZ);
@@ -161,9 +167,15 @@ const update = () => {
           image: props.data,
           bounds: [ [x0,y0], [x1,y1],[x2,y2],[x3,y3] ],
           desaturate: 0.7,
+
           //transparentColor: [255, 0, 0, 255],
         });
       },
+      // filterSubLayer : (layer, cullRect) => {
+      //   console.log(layer, cullRect)
+      //   return true;
+      // },
+
       //extent: [117, 28, 133, 44],
       refinementStrategy : 'no-overlap',
       onTileError: (error, tile) => {},
@@ -174,6 +186,22 @@ const update = () => {
         depthTest: false,
       },
 
+      onTileLoad : (tile) => {
+        //tile.isVisible = true;
+        //tile.isSelected = true;
+        //이미 컬링된 결과가 올라오기 때문에, 여기서는 제어할 수가 없다.
+        //컬링 이전을 건드려야 가장자리 잘리는 것들을 제어가능함
+        //console.log("onTileLoad",tile);
+      },
+      onTileUnload : (tile) => {
+        //console.log("onTileUnload", tile);
+      },
+      // modelMatrix : [
+      //       0.5, 0, 0, 0,  
+      //       0, 0.5, 0, 0,  
+      //       0, 0, 0.5, 0,      
+      //       0, 0, 0, 1   
+      //     ],
       //tintColor: [200, 180, 180],
       visible: true, 
     }),
@@ -303,7 +331,7 @@ const update = () => {
   
   ];
 
-
+  //console.log(layers);
   deckgl.setProps({layers});
 };
 
